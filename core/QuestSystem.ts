@@ -43,6 +43,7 @@ export class QuestSystem {
 
         this.messenger = config.messenger;
         this.databaseManager = DatabaseManager.getInstance(config.mongoClient);
+        this.messenger.init(config);
     }
     /**
      * Implements the Singleton Pattern
@@ -61,7 +62,6 @@ export class QuestSystem {
     public static init(config: QuestSystemConfig) {
         const questSystem = QuestSystem.getInstance(config);
         return questSystem;
-
     }
 
     private async startQuestForPlayer(player: Player, quest: IQuest) {}

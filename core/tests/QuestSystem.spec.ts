@@ -85,7 +85,6 @@ afterEach(() => {
 describe('QuestSystem', () => {
   test('QuestSystem init', () => {
     const questSystem = QuestSystem.init({
-      messageProtocol: {},
       mongoClient,
     });
     expect(questSystem).toBeDefined();

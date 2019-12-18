@@ -1,4 +1,5 @@
 import {INotificationData} from '../types';
+import {QuestSystemConfig} from '../QuestSystem';
 
 
 export type CompletedTaskPayload<IDType = any> = {
@@ -26,6 +27,7 @@ export type CompletedQuestPayload<IDType = any> = {
 }
 export interface IMessengerProtocol {
 
+  init(config: QuestSystemConfig): void;
   sendCompletedTask(payload: CompletedTaskPayload): void;
   sendCompletedMission(payload: CompletedMissionPayload): void;
   sendCompletedQuest(payload: CompletedQuestPayload): void;
