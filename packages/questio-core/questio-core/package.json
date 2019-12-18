@@ -5,9 +5,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "test": "jest",
+    "test": "../node_modules/.bin/jest",
     "prepare": "npm run build",
-    "build": "tsc"
+    "build": "../node_modules/.bin/tsc"
   },
   "repository": {
     "type": "git",
@@ -27,6 +27,7 @@
     "@types/node": "^12.11.1",
     "@types/sinon": "^7.5.0",
     "jest": "^24.9.0",
+    "lerna": "^3.19.0",
     "sinon": "^7.5.0",
     "ts-jest": "^24.1.0",
     "typescript": "^3.6.4"
