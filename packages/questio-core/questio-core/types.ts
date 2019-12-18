@@ -6,7 +6,16 @@ export interface Player {
 
 export type NotificationId = string;
 
+export enum NotificationType {
+    EVENT = 'QS_EVENT',
+    START_NEXT_MISSION = 'QS_START_NEXT_MISSION',
+    START_QUEST = 'QS_START_QUEST',
+    FORCE_TASK_COMPLETE = 'QS_FORCE_TASK_COMPLETE',
+}
+
+
 export interface INotificationData {
+    type: NotificationType;
     player: Player;
     event: string;
     [x: string]: any;

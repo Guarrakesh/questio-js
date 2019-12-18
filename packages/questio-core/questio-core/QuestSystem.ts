@@ -3,7 +3,7 @@ import {
     INotificationData,
     IPlayerTask,
     IQuest,
-    ITask, MissionTasks,
+    ITask, MissionTasks, NotificationType,
     Player,
     TaskCondition,
     TaskConditionOperator,
@@ -14,7 +14,8 @@ import {
 import {MongoClient} from 'mongodb';
 import {DatabaseManager} from './database/DatabaseManager';
 import {checkMissionCompleted} from './utils/checkMissionCompleted';
-import {IMessageProtocol} from './interfaces/IMessageProtocol';
+import {IMessengerProtocol} from './interfaces/IMessageProtocol';
+import {validateQuestSystemConfig} from './utils/validateQuestSystemConfig';
 
 export type StorageConfig = {
     class: Type<IStorage>
@@ -22,13 +23,14 @@ export type StorageConfig = {
 }
 export type QuestSystemConfig = {
     mongoClient: MongoClient;
-    messageProtocol: IMessageProtocol;
+    messenger: IMessengerProtocol;
     //  storage: StorageConfig;
 
 }
 export class QuestSystem {
     private static instance?: QuestSystem;
 
+    private messenger: IMessengerProtocol;
 
 
     private databaseManager: DatabaseManager;
@@ -37,6 +39,9 @@ export class QuestSystem {
     private constructor(config: QuestSystemConfig) {
         // this.storage = new config.storage.class(config.storage.config);
 
+        validateQuestSystemConfig(config);
+
+        this.messenger = config.messenger;
         this.databaseManager = DatabaseManager.getInstance(config.mongoClient);
     }
     /**
@@ -55,40 +60,11 @@ export class QuestSystem {
     }
     public static init(config: QuestSystemConfig) {
         const questSystem = QuestSystem.getInstance(config);
-
         return questSystem;
-        // return DatabaseManager.getInstance().getActiveQuests().then(quests => {
-        //     quests.forEach((quest: any) => {
-        //         quest.missions.forEach((mission: any) => {
-        //             mission.tasks.forEach((taskGroups: any) => {
-        //                 taskGroups.forEach((task: any) => {
-        //                     questSystem.taskClasses.map(c => {
-        //                         if (c.name === task.className && c.prototype.triggers) {
-        //                             c.prototype.triggers.forEach((t: string) =>
-        //                               questSystem.emitter.addListener(t, data => questSystem.eventListener(t,data))
-        //                             );
-        //                         }
-        //                     });
-        //                 });
-        //             })
-        //         })
-        //     })
-        // });
-
-        // questSystem.taskClasses.forEach(taskClass => {
-        //     questSystem.taskInstances.push(new taskClass());
-        //     if (taskClass.prototype.hasOwnProperty('triggers')) {
-        //         taskClass.prototype.triggers.forEach(trigger => {
-        //             questSystem.emitter.on(trigger, questSystem.)
-        //         })
-        //     }
-        // });
-
 
     }
-    private async startQuestForPlayer(player: Player, quest: IQuest) {
 
-    }
+    private async startQuestForPlayer(player: Player, quest: IQuest) {}
 
 
     /**
@@ -100,9 +76,7 @@ export class QuestSystem {
     public async onMessage(data: INotificationData): Promise<Boolean> {
         console.log(`[*] Just received a %s from player %s`, data.event, data.player.id);
         try {
-
             await this.handleMessage(data);
-
             return true;
         } catch (ex) {
             console.error('[!][QuestSystem::onMessage]: ' + ex.toString() );
@@ -110,9 +84,22 @@ export class QuestSystem {
         }
     }
 
+
     private async handleMessage(data: INotificationData) {
 
-        // Get the active user tasks from the storages
+        switch (data.type) {
+            case NotificationType.EVENT:
+                return this.handleTrigger(data);
+
+            default:
+                return ;
+
+        }
+
+    }
+
+
+    private async handleTrigger(data: INotificationData) {
         const userTasks = await this.databaseManager.getPlayerActiveTasks(data.player.id);
 
         if (!userTasks) return true;
@@ -126,27 +113,45 @@ export class QuestSystem {
         await this.databaseManager.completePlayerTasks(completedTask.map(t => t.id));
 
         for (const task of completedTask) {
-            this.sendCompletedTaskMessage(task.playerId, task.taskId);
+            this.sendCompletedTaskMessage(task, data.event);
             if ((await this.checkMissionCompletedByTask(task))) {
-                await this.completeMission(task.playerId, task.missionId);
+                await this.completeMission(task, data.event);
                 this.sendCompletedMissionMessage(task.playerId, task.missionId);
                 if (await this.checkQuestCompleted(task.playerId, task.questId)) {
-                    this.sendCompletedQuestMessage(task.playerId, task.questId)
+                    this.sendCompletedQuestMessage(task, data.event)
                 }
             }
         }
     }
 
-
-    async sendCompletedTaskMessage(playerId: any, taskId: any) {
-
+    async sendCompletedTaskMessage(task: IPlayerTask, trigger: string) {
+        this.messenger.sendCompletedTask({
+            playerId: task.playerId,
+            questId: task.questId,
+            missionId: task.missionId,
+            taskId: task.taskId,
+            completedAt: Date.now(),
+            trigger
+        });
     }
 
-    async sendCompletedMissionMessage(playerId: any, missionId: any){
-
+    async sendCompletedMissionMessage(task: IPlayerTask, trigger: string){
+        this.messenger.sendCompletedMission({
+            playerId: task.playerId,
+            questId: task.questId,
+            missionId: task.missionId,
+            completedByTaskId: task.taskId,
+            completedAt: Date.now(),
+        })
     }
-    async sendCompletedQuestMessage(playerId: any, mquestId: any) {
 
+    async sendCompletedQuestMessage(task: IPlayerTask, trigger: string) {
+        this.messenger.sendCompletedQuest({
+            playerId: task.playerId,
+            questId: task.questId,
+            completedByTaskId: task.taskId,
+            completedAt: Date.now(),
+        })
     }
     /**
      * Checks if a player has completed a quest
@@ -155,7 +160,7 @@ export class QuestSystem {
      * @param questId
      */
     public async checkQuestCompleted(playerId: any, questId: any ) {
-       return await this.databaseManager.checkQuestCompleted(playerId, questId);
+        return await this.databaseManager.checkQuestCompleted(playerId, questId);
     }
     /**
      * Marks a user mission as completed.
